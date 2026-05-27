@@ -7,34 +7,6 @@ interface BoardProps {
   onNodeClick: (index: number) => void
 }
 
-// Board coordinates for 24 positions (3 concentric squares)
-const POSITIONS: { [key: number]: [number, number] } = {
-  0: [50, 50],
-  1: [150, 50],
-  2: [250, 50],
-  3: [250, 150],
-  4: [250, 250],
-  5: [150, 250],
-  6: [50, 250],
-  7: [50, 150],
-  8: [50, 150],
-  9: [100, 100],
-  10: [200, 100],
-  11: [200, 200],
-  12: [200, 300],
-  13: [100, 300],
-  14: [0, 300],
-  15: [0, 200],
-  16: [0, 100],
-  17: [100, 0],
-  18: [200, 0],
-  19: [200, 100],
-  20: [200, 200],
-  21: [100, 200],
-  22: [0, 200],
-  23: [0, 100],
-}
-
 // Correct positions - 3 concentric squares, 8 points each
 const BOARD_POSITIONS: { [key: number]: [number, number] } = {
   // Outer square (0-7)
@@ -122,15 +94,25 @@ export default function MorrisBoard({
         <line x1="200" y1="200" x2="100" y2="200" stroke="#d4a96a" strokeWidth="2" />
         <line x1="100" y1="200" x2="100" y2="100" stroke="#d4a96a" strokeWidth="2" />
 
-        {/* Inner square */}
+        {/* Cross-connecting lines through outer and middle squares */}
+        {/* Vertical cross lines from outer through middle */}
+        <line x1="150" y1="50" x2="150" y2="100" stroke="#d4a96a" strokeWidth="2" />
+        <line x1="150" y1="200" x2="150" y2="250" stroke="#d4a96a" strokeWidth="2" />
+        {/* Horizontal cross lines from outer through middle */}
+        <line x1="50" y1="150" x2="100" y2="150" stroke="#d4a96a" strokeWidth="2" />
+        <line x1="200" y1="150" x2="250" y2="150" stroke="#d4a96a" strokeWidth="2" />
+
+        {/* Inner square outline (no internal lines, just the border) */}
         <line x1="125" y1="125" x2="175" y2="125" stroke="#d4a96a" strokeWidth="2" />
         <line x1="175" y1="125" x2="175" y2="175" stroke="#d4a96a" strokeWidth="2" />
         <line x1="175" y1="175" x2="125" y2="175" stroke="#d4a96a" strokeWidth="2" />
         <line x1="125" y1="175" x2="125" y2="125" stroke="#d4a96a" strokeWidth="2" />
 
-        {/* Diagonal lines from midpoints */}
-        <line x1="150" y1="50" x2="150" y2="250" stroke="#d4a96a" strokeWidth="2" />
-        <line x1="50" y1="150" x2="250" y2="150" stroke="#d4a96a" strokeWidth="2" />
+        {/* Connecting lines from middle square to inner square at midpoints */}
+        <line x1="150" y1="100" x2="150" y2="125" stroke="#d4a96a" strokeWidth="2" />
+        <line x1="200" y1="150" x2="175" y2="150" stroke="#d4a96a" strokeWidth="2" />
+        <line x1="150" y1="200" x2="150" y2="175" stroke="#d4a96a" strokeWidth="2" />
+        <line x1="100" y1="150" x2="125" y2="150" stroke="#d4a96a" strokeWidth="2" />
 
         {/* Nodes */}
         {Array.from({ length: 24 }).map((_, i) => {

@@ -18,79 +18,119 @@ interface GameState {
   selectedNode: number | null
   validMoves: number[]
   millFormed: boolean
+  pendingRemovals: number // how many pieces still need to be removed
+  removingPlayer: Player | null // which player must remove the piece(s)
   selectedForRemoval: number | null
   gameOver: boolean
   winner: Player | null
 }
 
-// Board positions (24 total - 3 concentric squares with 8 points each)
-// Adjacency: only orthogonally adjacent points on the same line or connecting lines
-const ADJACENCY = {
-  // Outer square (0-7): corners [0,2,4,6] and midpoints [1,3,5,7]
-  0: [1, 7, 8],      // top-left corner: [1 right], [7 down], [8 inner-connection]
-  1: [0, 2, 9],      // top midpoint: [0 left], [2 right], [9 inner-connection]
-  2: [1, 3, 10],     // top-right corner: [1 left], [3 down], [10 inner-connection]
-  3: [2, 4, 11],     // right midpoint: [2 up], [4 down], [11 inner-connection]
-  4: [3, 5, 12],     // bottom-right corner: [3 up], [5 left], [12 inner-connection]
-  5: [4, 6, 13],     // bottom midpoint: [4 right], [6 left], [13 inner-connection]
-  6: [5, 7, 14],     // bottom-left corner: [5 right], [7 up], [14 inner-connection]
-  7: [6, 0, 15],     // left midpoint: [6 down], [0 up], [15 inner-connection]
-  // Middle square (8-15): corners [8,10,12,14] and midpoints [9,11,13,15]
-  8: [0, 9, 15],     // top-left corner: [0 outer], [9 right], [15 left]
-  9: [1, 8, 10, 17],     // top midpoint: [1 outer], [8 left], [10 right]
-  10: [2, 9, 11],    // top-right corner: [2 outer], [9 left], [11 down]
-  11: [3, 10, 12, 19],   // right midpoint: [3 outer], [10 up], [12 down]
-  12: [4, 11, 13],   // bottom-right corner: [4 outer], [11 up], [13 left]
-  13: [5, 12, 14, 21],   // bottom midpoint: [5 outer], [12 right], [14 left], [21 inner-down]
-  14: [6, 13, 15],   // bottom-left corner: [6 outer], [13 right], [15 up]
-  15: [7, 14, 8, 23],    // left midpoint: [7 outer], [14 down], [8 right]
-  // Inner square (16-23): corners [16,18,20,22] and midpoints [17,19,21,23]
-  16: [8, 17, 23],   // top-left corner: [8 outer], [17 right], [23 left]
-  17: [9, 16, 18],   // top midpoint: [9 outer], [16 left], [18 right]   // top midpoint: [9 outer], [16 left], [18 right]
-  18: [10, 17, 19],  // top-right corner: [10 outer], [17 left], [19 down]
-  19: [11, 18, 20],  // right midpoint: [11 outer], [18 up], [20 down]  // right midpoint: [11 outer], [18 up], [20 down]
-  20: [12, 19, 21],  // bottom-right corner: [12 outer], [19 up], [21 left]
-  21: [13, 20, 22],  // bottom midpoint: [13 outer], [20 right], [22 left]  // bottom midpoint: [13 outer], [20 right], [22 left]
-  22: [14, 21, 23],  // bottom-left corner: [14 outer], [21 right], [23 up]
-  23: [15, 22, 16],  // left midpoint: [15 outer], [22 down], [16 right]  // left midpoint: [15 outer], [22 down], [16 right]
-}
+// 24 positions: Outer (0-7), Middle (8-15), Inner (16-23)
+// Each ring: TL, TM, TR, MR, BR, BM, BL, ML (clockwise from top-left)
 
-// Mill combinations - only aligned positions
+// All 16 mills: 4 outer, 4 middle, 4 inner, 4 spokes
 const MILLS = [
-  // Outer square horizontal lines
-  [0, 1, 2],
-  [4, 5, 6],
-  // Outer square vertical lines
-  [2, 3, 4],
-  [6, 7, 0],
-  // Middle square horizontal lines
-  [8, 9, 10],
-  [12, 13, 14],
-  // Middle square vertical lines
-  [10, 11, 12],
-  [14, 15, 8],
-  // Inner square horizontal lines
-  [16, 17, 18],
-  [20, 21, 22],
-  // Inner square vertical lines
-  [18, 19, 20],
-  [22, 23, 16],
-  // Cross lines through midpoints (vertical)
-  [1, 9, 17],
-  [3, 11, 19],
-  [5, 13, 21],
-  [7, 15, 23],
+  // Outer ring
+  [0, 1, 2],   // top horizontal
+  [2, 3, 4],   // right vertical
+  [4, 5, 6],   // bottom horizontal
+  [6, 7, 0],   // left vertical
+  // Middle ring
+  [8, 9, 10],  // top horizontal
+  [10, 11, 12], // right vertical
+  [12, 13, 14], // bottom horizontal
+  [14, 15, 8],  // left vertical
+  // Inner ring
+  [16, 17, 18], // top horizontal
+  [18, 19, 20], // right vertical
+  [20, 21, 22], // bottom horizontal
+  [22, 23, 16], // left vertical
+  // Spokes (crossing all 3 rings)
+  [1, 9, 17],   // top spoke
+  [3, 11, 19],  // right spoke
+  [5, 13, 21],  // bottom spoke
+  [7, 15, 23],  // left spoke
 ]
 
-const detectMill = (board: Board, positions: number[]): boolean => {
-  return MILLS.some((mill) =>
-    mill.every((pos) => board[pos] === board[positions[0]])
-  )
+// Adjacency: valid moves during phase 2 (moving)
+// NO diagonal connections, only along lines
+const ADJACENCY = {
+  // Outer ring
+  0: [1, 7],
+  1: [0, 2, 9],
+  2: [1, 3],
+  3: [2, 4, 11],
+  4: [3, 5],
+  5: [4, 6, 13],
+  6: [5, 7],
+  7: [6, 0, 15],
+  // Middle ring
+  8: [9, 15],
+  9: [8, 10, 17],  // ✅ connect inward to 17, not back to 1
+  10: [9, 11],
+  11: [10, 12, 19], // ✅ connect inward to 19, not back to 3
+  12: [11, 13],
+  13: [12, 14, 21], // ✅ connect inward to 21, not back to 5
+  14: [13, 15],
+  15: [14, 8, 23],  // ✅ connect inward to 23, not back to 7
+  // Inner ring
+  16: [17, 23],
+  17: [16, 18, 9],
+  18: [17, 19],
+  19: [18, 20, 11],
+  20: [19, 21],
+  21: [20, 22, 13],
+  22: [21, 23],
+  23: [22, 16, 15],
+} as const
+
+const millKey = (mill: number[]): string => mill.join(',')
+
+const isInMill = (board: Board, pos: number): boolean => {
+  const occupant = board[pos]
+  if (!occupant) return false
+  return MILLS.some((mill) => mill.includes(pos) && mill.every((p) => board[p] === occupant))
 }
 
-const hasMill = (board: Board, position: number): boolean => {
-  const player = board[position]
-  return MILLS.some((mill) => mill.includes(position) && mill.every((pos) => board[pos] === player))
+const countNewlyFormedMills = (board: Board, player: Player, prevActiveMills: Set<string>): number => {
+  let count = 0
+  for (const mill of MILLS) {
+    const key = millKey(mill)
+    if (mill.every((pos) => board[pos] === player) && !prevActiveMills.has(key)) {
+      count++
+    }
+  }
+  return count
+}
+
+const getActiveMills = (board: Board, player: Player): Set<string> => {
+  const active = new Set<string>()
+  for (const mill of MILLS) {
+    if (mill.every((pos) => board[pos] === player)) {
+      active.add(millKey(mill))
+    }
+  }
+  return active
+}
+
+const countPieces = (board: Board, player: Player): number => {
+  return Object.values(board).filter((p) => p === player).length
+}
+
+const canRemovePiece = (board: Board, position: number, targetPlayer: Player): boolean => {
+  // Cannot remove from empty position
+  if (board[position] !== targetPlayer) return false
+
+  // Can always remove pieces NOT in mills
+  if (!isInMill(board, position)) return true
+
+  // Can only remove pieces IN mills if ALL opponent pieces are in mills
+  const allInMills = Object.keys(board)
+    .map(Number)
+    .filter((pos) => board[pos] === targetPlayer)
+    .every((pos) => isInMill(board, pos))
+
+  return allInMills
 }
 
 const getValidAdjacentMoves = (board: Board, from: number): number[] => {
@@ -103,6 +143,25 @@ const getValidFlyingMoves = (board: Board): number[] => {
   return Object.keys(board)
     .map(Number)
     .filter((pos) => board[pos] === null)
+}
+
+const hasValidMoves = (board: Board, player: Player): boolean => {
+  const pieceCount = countPieces(board, player)
+
+  // Flying: can move to any empty position
+  if (pieceCount === 3) {
+    return Object.values(board).some((p) => p === null)
+  }
+
+  // Moving: check if any piece has an adjacent empty position
+  for (let i = 0; i < 24; i++) {
+    if (board[i] === player) {
+      const adjacentEmpty = getValidAdjacentMoves(board, i)
+      if (adjacentEmpty.length > 0) return true
+    }
+  }
+
+  return false
 }
 
 export const useNineMensMorris = () => {
@@ -121,64 +180,79 @@ export const useNineMensMorris = () => {
     selectedNode: null,
     validMoves: [],
     millFormed: false,
+    pendingRemovals: 0,
+    removingPlayer: null,
     selectedForRemoval: null,
     gameOver: false,
     winner: null,
   })
 
-  const countPieces = useCallback((board: Board, player: Player): number => {
-    return Object.values(board).filter((p) => p === player).length
-  }, [])
-
-  const canRemovePiece = useCallback(
-    (board: Board, position: number, player: Player): boolean => {
-      if (board[position] !== player) return false
-      if (!hasMill(board, position)) return true
-
-      const allInMills = Object.entries(board)
-        .filter(([, p]) => p === player)
-        .every(([pos]) => hasMill(board, Number(pos)))
-
-      return allInMills
-    },
-    []
-  )
-
   const handleNodeClick = useCallback(
     (nodeIndex: number) => {
       if (gameState.gameOver) return
 
-      if (gameState.millFormed) {
-        // Player must remove an opponent's piece after forming a mill
-        const opponent = gameState.currentPlayer === 'white' ? 'black' : 'white'
-
-        if (
-          gameState.board[nodeIndex] === opponent &&
-          canRemovePiece(gameState.board, nodeIndex, opponent)
-        ) {
+      // Handle piece removal after forming a mill
+      if (gameState.pendingRemovals > 0) {
+        const opponent = gameState.removingPlayer === 'white' ? 'black' : 'white'
+        if (gameState.board[nodeIndex] === opponent && canRemovePiece(gameState.board, nodeIndex, opponent)) {
           const newBoard = { ...gameState.board }
           newBoard[nodeIndex] = null
 
           const newLostCount =
-            gameState.currentPlayer === 'white'
+            gameState.removingPlayer === 'white'
               ? gameState.blackLost + 1
               : gameState.whiteLost + 1
 
-          const winner =
-            newLostCount >= 7
-              ? gameState.currentPlayer
-              : null
+          const remainingRemovals = gameState.pendingRemovals - 1
 
-          setGameState((prev) => ({
-            ...prev,
-            board: newBoard,
-            blackLost: gameState.currentPlayer === 'white' ? newLostCount : prev.blackLost,
-            whiteLost: gameState.currentPlayer === 'black' ? newLostCount : prev.whiteLost,
-            millFormed: false,
-            currentPlayer: gameState.currentPlayer === 'white' ? 'black' : 'white',
-            gameOver: !!winner,
-            winner,
-          }))
+          if (remainingRemovals === 0) {
+            // All removals done - player who removed stays active for next move (official rules)
+            const movingPlayer = gameState.removingPlayer!
+            const opponent = movingPlayer === 'white' ? 'black' : 'white'
+            let winner: Player | null = null
+
+            // Determine correct phase for the moving player
+            const movingPhase = gameState.whiteRemaining === 0 && gameState.blackRemaining === 0
+              ? (countPieces(newBoard, movingPlayer) === 3 ? 'flying' : 'moving')
+              : gameState.phase
+
+            // Check win conditions on opponent
+            const opponentPieceCount = countPieces(newBoard, opponent)
+            const stillPlacing = gameState.whiteRemaining > 0 || gameState.blackRemaining > 0
+
+            if (opponentPieceCount < 3 && !stillPlacing) {
+              // Opponent has < 3 pieces (only counts after placing phase)
+              winner = movingPlayer
+            } else if (movingPhase !== 'placing' && !hasValidMoves(newBoard, opponent)) {
+              // Opponent has no valid moves
+              winner = movingPlayer
+            }
+
+            setGameState((prev) => ({
+              ...prev,
+              board: newBoard,
+              blackLost: movingPlayer === 'white' ? newLostCount : prev.blackLost,
+              whiteLost: movingPlayer === 'black' ? newLostCount : prev.whiteLost,
+              millFormed: false,
+              pendingRemovals: 0,
+              removingPlayer: null,
+              selectedNode: null,
+              validMoves: [],
+              phase: movingPhase,
+              currentPlayer: movingPlayer,
+              gameOver: !!winner,
+              winner,
+            }))
+          } else {
+            // More removals needed
+            setGameState((prev) => ({
+              ...prev,
+              board: newBoard,
+              blackLost: gameState.removingPlayer === 'white' ? newLostCount : prev.blackLost,
+              whiteLost: gameState.removingPlayer === 'black' ? newLostCount : prev.whiteLost,
+              pendingRemovals: remainingRemovals,
+            }))
+          }
         }
         return
       }
@@ -189,7 +263,16 @@ export const useNineMensMorris = () => {
         const newBoard = { ...gameState.board }
         newBoard[nodeIndex] = gameState.currentPlayer
 
-        const millFormed = detectMill(newBoard, [nodeIndex])
+        const whiteRemaining = gameState.whiteRemaining - (gameState.currentPlayer === 'white' ? 1 : 0)
+        const blackRemaining = gameState.blackRemaining - (gameState.currentPlayer === 'black' ? 1 : 0)
+
+        // Calculate previous active mills for this player
+        const prevActiveMills = getActiveMills(gameState.board, gameState.currentPlayer)
+        const newlyFormedMillCount = countNewlyFormedMills(newBoard, gameState.currentPlayer, prevActiveMills)
+        const millFormed = newlyFormedMillCount > 0
+
+        const newPhase =
+          whiteRemaining === 0 && blackRemaining === 0 ? 'moving' : 'placing'
 
         if (millFormed) {
           setGameState((prev) => ({
@@ -197,16 +280,15 @@ export const useNineMensMorris = () => {
             board: newBoard,
             selectedNode: null,
             validMoves: [],
+            whiteRemaining,
+            blackRemaining,
+            phase: newPhase,
             millFormed: true,
+            pendingRemovals: newlyFormedMillCount,
+            removingPlayer: gameState.currentPlayer,
           }))
           return
         }
-
-        const whiteRemaining = gameState.whiteRemaining - (gameState.currentPlayer === 'white' ? 1 : 0)
-        const blackRemaining = gameState.blackRemaining - (gameState.currentPlayer === 'black' ? 1 : 0)
-
-        const newPhase =
-          whiteRemaining === 0 && blackRemaining === 0 ? 'moving' : 'placing'
 
         setGameState((prev) => ({
           ...prev,
@@ -235,14 +317,12 @@ export const useNineMensMorris = () => {
             }))
           }
         } else if (nodeIndex === gameState.selectedNode) {
-          // Clicking the same piece deselects it
           setGameState((prev) => ({
             ...prev,
             selectedNode: null,
             validMoves: [],
           }))
         } else if (gameState.board[nodeIndex] === gameState.currentPlayer) {
-          // Clicking another piece of the same player reselects it
           const pieceCount = countPieces(gameState.board, gameState.currentPlayer)
           const validMoves =
             pieceCount === 3
@@ -260,7 +340,9 @@ export const useNineMensMorris = () => {
           newBoard[gameState.selectedNode] = null
           newBoard[nodeIndex] = gameState.currentPlayer
 
-          const millFormed = detectMill(newBoard, [nodeIndex])
+          const prevActiveMills = getActiveMills(gameState.board, gameState.currentPlayer)
+          const newlyFormedMillCount = countNewlyFormedMills(newBoard, gameState.currentPlayer, prevActiveMills)
+          const millFormed = newlyFormedMillCount > 0
 
           if (millFormed) {
             setGameState((prev) => ({
@@ -269,6 +351,27 @@ export const useNineMensMorris = () => {
               selectedNode: null,
               validMoves: [],
               millFormed: true,
+              pendingRemovals: newlyFormedMillCount,
+              removingPlayer: gameState.currentPlayer,
+            }))
+            return
+          }
+
+          const nextPlayer = gameState.currentPlayer === 'white' ? 'black' : 'white'
+          const opponentPieceCount = countPieces(newBoard, nextPlayer)
+
+          // Determine next phase
+          const nextPhase = opponentPieceCount === 3 ? 'flying' : gameState.phase
+
+          // Check if opponent has lost
+          if (opponentPieceCount < 3 || !hasValidMoves(newBoard, nextPlayer)) {
+            setGameState((prev) => ({
+              ...prev,
+              board: newBoard,
+              selectedNode: null,
+              validMoves: [],
+              gameOver: true,
+              winner: gameState.currentPlayer,
             }))
             return
           }
@@ -278,12 +381,13 @@ export const useNineMensMorris = () => {
             board: newBoard,
             selectedNode: null,
             validMoves: [],
-            currentPlayer: gameState.currentPlayer === 'white' ? 'black' : 'white',
+            phase: nextPhase,
+            currentPlayer: nextPlayer,
           }))
         }
       }
     },
-    [gameState, canRemovePiece, countPieces]
+    [gameState]
   )
 
   const restart = useCallback(() => {
@@ -298,6 +402,8 @@ export const useNineMensMorris = () => {
       selectedNode: null,
       validMoves: [],
       millFormed: false,
+      pendingRemovals: 0,
+      removingPlayer: null,
       selectedForRemoval: null,
       gameOver: false,
       winner: null,

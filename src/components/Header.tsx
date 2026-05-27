@@ -39,7 +39,7 @@ export default function Header() {
     <>
       <header className="bg-darkMahogany bg-opacity-80 backdrop-blur-md border-b border-goldenTan border-opacity-30 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-woodText">Board Games</h1>
+          <h1 className="text-2xl font-bold text-woodText">BOARED</h1>
 
           <div className="relative">
             {!isLoggedIn ? (

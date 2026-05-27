@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, RotateCcw } from 'lucide-react'
+import { ArrowLeft, RotateCcw, Gamepad2 } from 'lucide-react'
 import { useNineMensMorris } from '../hooks/useNineMensMorris'
 import MorrisBoard from '../components/MorrisBoard'
 
@@ -19,17 +19,20 @@ export default function NineMensMorris() {
 
         <div className="bg-darkMahogany rounded-2xl shadow-lg p-8 border border-goldenTan border-opacity-30">
           <div className="flex justify-between items-start mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-woodText mb-2">
-                Nine Men's Morris
-              </h2>
-              <p className="text-woodText text-opacity-70">
-                {game.phase === 'placing'
-                  ? 'Phase: Placing'
-                  : game.phase === 'flying'
-                    ? 'Phase: Flying'
-                    : 'Phase: Moving'}
-              </p>
+            <div className="flex items-center gap-6">
+              <Gamepad2 size={56} className="text-warmAmber" />
+              <div>
+                <h2 className="text-3xl font-bold text-woodText mb-2">
+                  Nine Men's Morris
+                </h2>
+                <p className="text-woodText text-opacity-70">
+                  {game.phase === 'placing'
+                    ? 'Phase: Placing'
+                    : game.phase === 'flying'
+                      ? 'Phase: Flying'
+                      : 'Phase: Moving'}
+                </p>
+              </div>
             </div>
             <button
               onClick={game.restart}

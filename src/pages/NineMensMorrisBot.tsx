@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, RotateCcw } from 'lucide-react'
 import { useNineMensMorris } from '../hooks/useNineMensMorris'
-import { useBot, BotDifficulty } from '../hooks/useBot'
+import { useMinimax } from '../hooks/useMinimax'
+import type { BotDifficulty } from '../hooks/useMinimax'
 import MorrisBoard from '../components/MorrisBoard'
 
 export default function NineMensMorrisBot() {
   const [difficulty, setDifficulty] = useState<BotDifficulty | null>(null)
   const game = useNineMensMorris()
-  const bot = useBot(difficulty || 'medium')
+  const bot = useMinimax(difficulty || 'medium')
   const [isPlayerWhite, setIsPlayerWhite] = useState(true)
 
   useEffect(() => {
@@ -17,8 +18,8 @@ export default function NineMensMorrisBot() {
     // Bot's turn
     if (game.currentPlayer === (isPlayerWhite ? 'black' : 'white')) {
       const timer = setTimeout(() => {
-        if (game.millFormed) {
-          // Bot needs to remove a piece
+        // Handle pending removals from formed mills
+        if (game.pendingRemovals > 0 && game.removingPlayer === game.currentPlayer) {
           const removal = bot.getRemovalChoice(game.board, game.currentPlayer)
           if (removal !== -1) {
             game.handleNodeClick(removal)
@@ -40,7 +41,7 @@ export default function NineMensMorrisBot() {
 
       return () => clearTimeout(timer)
     }
-  }, [game.currentPlayer, game.phase, game.millFormed, difficulty, isPlayerWhite, bot, game])
+  }, [game.currentPlayer, game.phase, game.pendingRemovals, game.removingPlayer, difficulty, isPlayerWhite, bot, game])
 
   if (!difficulty) {
     return (
@@ -125,10 +126,12 @@ export default function NineMensMorrisBot() {
           </div>
 
           {/* Game status */}
-          {game.millFormed && (
+          {game.pendingRemovals > 0 && (
             <div className="mb-6 p-4 bg-yellow-900 border-l-4 border-yellow-600 rounded">
               <p className="text-yellow-200 font-semibold">
-                🎯 Mill Formed! {game.currentPlayer === (isPlayerWhite ? 'white' : 'black') ? '(Your turn to remove)' : '(Bot is removing...)'} Select an opponent piece to remove.
+                🎯 Mill Formed! {game.removingPlayer === (isPlayerWhite ? 'white' : 'black') ? '(Your turn to remove)' : '(Bot is removing...)'}
+                {game.pendingRemovals > 1 && ` (${game.pendingRemovals} pieces to remove)`}
+                Select an opponent piece to remove.
               </p>
             </div>
           )}

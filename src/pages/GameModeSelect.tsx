@@ -14,7 +14,7 @@ export default function GameModeSelect() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
           {/* Player vs Player */}
           <Link
             to="/morris"
@@ -50,7 +50,7 @@ export default function GameModeSelect() {
           </Link>
         </div>
 
-        <div className="mt-16">
+        <div className="mt-6">
           <Link
             to="/"
             className="inline-flex items-center gap-2 text-woodText hover:text-goldenTan transition-colors text-opacity-70"

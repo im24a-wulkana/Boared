@@ -1,4 +1,4 @@
-import { Player, GamePhase } from './useNineMensMorris'
+import type { Player, GamePhase } from './useNineMensMorris'
 
 interface Board {
   [key: number]: Player | null
@@ -7,45 +7,52 @@ interface Board {
 export type BotDifficulty = 'easy' | 'medium' | 'hard'
 
 const ADJACENCY = {
-  0: [1, 7, 8],
+  // Outer ring
+  0: [1, 7],
   1: [0, 2, 9],
-  2: [1, 3, 10],
+  2: [1, 3],
   3: [2, 4, 11],
-  4: [3, 5, 12],
+  4: [3, 5],
   5: [4, 6, 13],
-  6: [5, 7, 14],
+  6: [5, 7],
   7: [6, 0, 15],
-  8: [0, 9, 15],
-  9: [1, 8, 10, 17],
-  10: [2, 9, 11],
-  11: [3, 10, 12, 19],
-  12: [4, 11, 13],
-  13: [5, 12, 14, 21],
-  14: [6, 13, 15],
-  15: [7, 14, 8, 23],
-  16: [8, 17, 23],
-  17: [9, 16, 18],
-  18: [10, 17, 19],
-  19: [11, 18, 20],
-  20: [12, 19, 21],
-  21: [13, 20, 22],
-  22: [14, 21, 23],
-  23: [15, 22, 16],
+  // Middle ring
+  8: [9, 15],
+  9: [8, 10, 17],  // ✅ connect inward to 17, not back to 1
+  10: [9, 11],
+  11: [10, 12, 19], // ✅ connect inward to 19, not back to 3
+  12: [11, 13],
+  13: [12, 14, 21], // ✅ connect inward to 21, not back to 5
+  14: [13, 15],
+  15: [14, 8, 23],  // ✅ connect inward to 23, not back to 7
+  // Inner ring
+  16: [17, 23],
+  17: [16, 18, 9],
+  18: [17, 19],
+  19: [18, 20, 11],
+  20: [19, 21],
+  21: [20, 22, 13],
+  22: [21, 23],
+  23: [22, 16, 15],
 } as const
 
 const MILLS = [
+  // Outer ring
   [0, 1, 2],
-  [4, 5, 6],
   [2, 3, 4],
+  [4, 5, 6],
   [6, 7, 0],
+  // Middle ring
   [8, 9, 10],
-  [12, 13, 14],
   [10, 11, 12],
+  [12, 13, 14],
   [14, 15, 8],
+  // Inner ring
   [16, 17, 18],
-  [20, 21, 22],
   [18, 19, 20],
+  [20, 21, 22],
   [22, 23, 16],
+  // Spokes
   [1, 9, 17],
   [3, 11, 19],
   [5, 13, 21],
@@ -106,7 +113,7 @@ export const useBot = (difficulty: BotDifficulty) => {
     return moves
   }
 
-  const scoreMove = (board: Board, from: number, to: number, player: Player): number => {
+  const scoreMove = (board: Board, from: number, to: number, player: Player, moveCount: number): number => {
     const opponent = player === 'white' ? 'black' : 'white'
     let score = 0
 
@@ -115,30 +122,59 @@ export const useBot = (difficulty: BotDifficulty) => {
     testBoard[from] = null
     testBoard[to] = player
 
-    // Check if move forms a mill
+    // Check if move forms a mill (highest priority)
     if (detectMill(testBoard, [to])) {
       score += 1000
     }
 
-    // Prefer moving pieces out of corners to center positions
-    if ([0, 2, 4, 6, 16, 18, 20, 22].includes(to)) {
-      score -= 50
-    }
-    if ([1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 8, 10, 12, 14].includes(to)) {
-      score += 30
-    }
-
-    // Block opponent's potential mills (medium/hard)
-    if (difficulty !== 'easy') {
-      for (const mill of MILLS) {
-        const opponentCount = mill.filter((pos) => testBoard[pos] === opponent).length
-        const emptyCount = mill.filter((pos) => testBoard[pos] === null).length
-        if (opponentCount === 2 && emptyCount === 1) {
-          const emptyPos = mill.find((pos) => testBoard[pos] === null)
-          if (emptyPos === to) score += 500
+    // Defensive: block opponent's mills
+    for (const mill of MILLS) {
+      const opponentCount = mill.filter((pos) => testBoard[pos] === opponent).length
+      const emptyCount = mill.filter((pos) => testBoard[pos] === null).length
+      if (opponentCount === 2 && emptyCount === 1) {
+        const emptyPos = mill.find((pos) => testBoard[pos] === null)
+        if (emptyPos === to) {
+          score += 600
         }
       }
     }
+
+    // Strategic positioning based on game phase and move count (for variety)
+    const playerPieceCount = countPieces(testBoard, player)
+    const strategy = moveCount % 3 // 0, 1, or 2 for different strategies
+
+    if (playerPieceCount > 6) {
+      // Early game
+      if (strategy === 0) {
+        // Strategy 1: center focus
+        if ([9, 11, 13, 15, 17, 19, 21, 23].includes(to)) score += 50
+      } else if (strategy === 1) {
+        // Strategy 2: balanced
+        if ([1, 3, 5, 7].includes(to)) score += 40
+      } else {
+        // Strategy 3: corners to center
+        if ([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22].includes(to)) score += 30
+      }
+    } else if (playerPieceCount > 3) {
+      // Mid game
+      if (strategy === 0) {
+        score += (24 - to) % 5 // Pseudo-random positioning
+      } else if (strategy === 1) {
+        score += to % 7
+      } else {
+        score += (to * 3) % 11
+      }
+    }
+
+    // Avoid leaving pieces isolated (but less strict for variety)
+    const opponentAdjacent = (ADJACENCY[to as keyof typeof ADJACENCY] || []).filter(
+      (pos) => testBoard[pos] === opponent
+    ).length
+    if (opponentAdjacent > 1) score -= 5
+
+    // Add variation based on position parity
+    if (to % 2 === 0) score += strategy * 2
+    else score += (2 - strategy) * 2
 
     return score
   }
@@ -169,7 +205,6 @@ export const useBot = (difficulty: BotDifficulty) => {
     if (difficulty === 'medium') {
       // Prefer removing pieces that break mill patterns
       let best = removablePieces[0]
-      let bestScore = -1
 
       for (const piece of removablePieces) {
         if (hasMill(board, piece)) {
@@ -180,12 +215,12 @@ export const useBot = (difficulty: BotDifficulty) => {
       return best
     }
 
-    // Hard: strategic removal
+    // Hard: strategic removal - prioritize pieces that block opponent strategies
     let best = removablePieces[0]
     let bestScore = -1
 
     for (const piece of removablePieces) {
-      let score = 0
+      let score = Math.random() * 10 // Add randomness to vary strategy
 
       if (hasMill(board, piece)) {
         score += 100
@@ -197,6 +232,11 @@ export const useBot = (difficulty: BotDifficulty) => {
       )
       if (adjacentToOpponent) {
         score += 50
+      }
+
+      // Prefer removing pieces on edges/corners vs center (strategic variety)
+      if ([0, 2, 4, 6, 16, 18, 20, 22].includes(piece)) {
+        score += 25
       }
 
       if (score > bestScore) {
@@ -233,9 +273,11 @@ export const useBot = (difficulty: BotDifficulty) => {
         }
       }
 
-      // Hard: try to form mills or block opponent
+      // Hard: try to form mills or block opponent with strategic variety
       let best = available[0]
       let bestScore = -1
+      const placementCount = Object.values(board).filter(p => p === player).length
+      const strategy = placementCount % 3
 
       for (const placement of available) {
         const testBoard = { ...board }
@@ -243,12 +285,31 @@ export const useBot = (difficulty: BotDifficulty) => {
         let score = 0
 
         if (detectMill(testBoard, [placement])) {
-          score += 500
+          score += 500 // Mills are always top priority
         }
 
-        // Prefer center
-        if ([9, 11, 13, 15].includes(placement)) score += 50
-        if ([1, 3, 5, 7].includes(placement)) score += 25
+        // Vary strategy based on pieces placed
+        if (strategy === 0) {
+          // Center focus
+          if ([9, 11, 13, 15].includes(placement)) score += 60
+          if ([1, 3, 5, 7].includes(placement)) score += 20
+        } else if (strategy === 1) {
+          // Balanced approach
+          if ([1, 3, 5, 7, 9, 11, 13, 15].includes(placement)) score += 40
+          if ([17, 19, 21, 23].includes(placement)) score += 30
+        } else {
+          // Perimeter focus
+          if ([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22].includes(placement)) score += 45
+          if ([1, 3, 5, 7].includes(placement)) score += 15
+        }
+
+        // Block opponent's potential mills
+        for (const mill of MILLS) {
+          const opponentCount = mill.filter((pos) => testBoard[pos] !== player && testBoard[pos] !== null).length
+          if (opponentCount === 2 && !mill.includes(placement)) {
+            score += 20
+          }
+        }
 
         if (score > bestScore) {
           bestScore = score
@@ -283,12 +344,13 @@ export const useBot = (difficulty: BotDifficulty) => {
       return { move: randomMove, placement: null }
     }
 
-    // Hard: use scoring
+    // Hard: use adaptive scoring with move count for variety
     let best = moves[0]
     let bestScore = -1
+    const moveCount = Object.values(board).filter(p => p !== null).length
 
     for (const [from, to] of moves) {
-      const score = scoreMove(board, from, to, player)
+      const score = scoreMove(board, from, to, player, moveCount)
       if (score > bestScore) {
         bestScore = score
         best = [from, to] as [number, number]

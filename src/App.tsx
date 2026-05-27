@@ -6,7 +6,6 @@ import NineMensMorris from './pages/NineMensMorris'
 import NineMensMorrisBot from './pages/NineMensMorrisBot'
 import FourInARow from './pages/FourInARow'
 import Chess from './pages/Chess'
-import './App.css'
 
 function App() {
   return (

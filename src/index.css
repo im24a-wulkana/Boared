@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   html, body, #root {
@@ -41,5 +43,63 @@
 
   h3 {
     font-size: 1.25rem;
+  }
+}
+
+@layer utilities {
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .fadeIn {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .slideInLeft {
+    animation: slideInLeft 0.3s ease-out;
+  }
+
+  .scaleIn {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      stroke-width: 3;
+      opacity: 1;
+    }
+    50% {
+      stroke-width: 2;
+      opacity: 0.6;
+    }
   }
 }
